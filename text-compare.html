@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>텍스트 비교기</title>
+  <style>
+    :root {
+      --bg:            #0d1117;
+      --surface:       #161b22;
+      --surface2:      #1c2128;
+      --border:        #30363d;
+      --text:          #c9d1d9;
+      --text-muted:    #8b949e;
+      --accent:        #58a6ff;
+
+      --add-bg:        #0d2818;
+      --add-char-bg:   #1a4731;
+      --add-fg:        #56d364;
+      --add-sign:      #2ea043;
+
+      --rem-bg:        #2d0f14;
+      --rem-char-bg:   #5c1a24;
+      --rem-fg:        #ff7b72;
+      --rem-sign:      #da3633;
+
+      --chg-left-bg:   #2d1a00;
+      --chg-right-bg:  #0d2818;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
+    .spacer { flex: 1; }
+
+    .btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: #2d333b; border-color: #8b949e; }
+    .btn.primary {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+    .btn.primary:hover { background: #2ea043; }
+    .btn.danger  { color: var(--rem-fg); }
+    .btn.danger:hover { background: var(--rem-bg); border-color: var(--rem-sign); }
+    .btn.ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--text-muted);
+    }
+    .btn.ghost:hover { color: var(--text); background: var(--surface2); border-color: var(--border); }
+
+    /* ── Input section ───────────────────────── */
+    .input-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .input-panel {
+      display: flex;
+      flex-direction: column;
+      padding: 14px 16px;
+    }
+    .input-panel:first-child { border-right: 1px solid var(--border); }
+
+    .input-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .input-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--text-muted);
+    }
+    .char-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    textarea {
+      width: 100%;
+      height: 180px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 10px 12px;
+      resize: vertical;
+      outline: none;
+      tab-size: 2;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--text-muted); }
+
+    /* ── Stats bar ───────────────────────────── */
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 8px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .stat { display: flex; align-items: center; gap: 5px; }
+    .stat-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+    .stat-dot.add { background: var(--add-sign); }
+    .stat-dot.rem { background: var(--rem-sign); }
+    .stat-dot.chg { background: #d29922; }
+
+    .view-toggle {
+      margin-left: auto;
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .view-btn {
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      transition: background .15s, color .15s;
+    }
+    .view-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .view-btn:not(.active):hover { background: var(--surface2); color: var(--text); }
+
+    /* ── Diff section ────────────────────────── */
+    .diff-section {
+      flex: 1;
+      overflow: auto;
+    }
+    .diff-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .diff-empty svg { opacity: .3; }
+
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    .diff-table td { padding: 1px 8px; vertical-align: top; white-space: pre-wrap; word-break: break-all; }
+
+    /* line numbers */
+    .ln {
+      width: 44px;
+      min-width: 44px;
+      color: var(--text-muted);
+      text-align: right;
+      padding-right: 12px;
+      user-select: none;
+      border-right: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    /* sign column */
+    .sign {
+      width: 20px;
+      min-width: 20px;
+      text-align: center;
+      user-select: none;
+      padding: 1px 0;
+    }
+
+    /* content column */
+    .dc { width: calc(50% - 64px); }
+
+    /* divider between left and right halves */
+    .div-col { width: 1px; background: var(--border); padding: 0; }
+
+    /* row types */
+    tr.eq .dc, tr.eq .ln, tr.eq .sign { background: transparent; }
+
+    tr.rem .dc, tr.rem .ln, tr.rem .sign { background: var(--rem-bg); }
+    tr.rem .sign { color: var(--rem-sign); }
+
+    tr.add .dc, tr.add .ln, tr.add .sign { background: var(--add-bg); }
+    tr.add .sign { color: var(--add-sign); }
+
+    tr.chg-l .dc, tr.chg-l .ln, tr.chg-l .sign { background: var(--chg-left-bg); }
+    tr.chg-l .sign { color: #d29922; }
+
+    tr.chg-r .dc, tr.chg-r .ln, tr.chg-r .sign { background: var(--chg-right-bg); }
+    tr.chg-r .sign { color: #d29922; }
+
+    /* inline char highlighting */
+    .ch-rem { background: var(--rem-char-bg); border-radius: 2px; }
+    .ch-add { background: var(--add-char-bg); border-radius: 2px; }
+
+    /* right-side placeholder in split view */
+    .placeholder { opacity: 0; pointer-events: none; }
+
+    /* ── Unified view ────────────────────────── */
+    .diff-table.unified .dc { width: calc(100% - 84px); }
+
+    /* ── History panel ───────────────────────── */
+    .history-panel {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .history-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+    }
+    .history-header:hover { background: var(--surface2); }
+    .history-header.open { border-bottom-color: var(--border); }
+    .history-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .history-count {
+      background: #30363d;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 20px;
+    }
+    .history-chevron {
+      margin-left: auto;
+      transition: transform .2s;
+      color: var(--text-muted);
+    }
+    .history-chevron.open { transform: rotate(180deg); }
+
+    .history-body {
+      max-height: 240px;
+      overflow-y: auto;
+      display: none;
+    }
+    .history-body.open { display: block; }
+
+    .history-empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12.5px;
+      transition: background .1s;
+    }
+    .history-item:hover { background: var(--surface2); }
+    .history-item:last-child { border-bottom: none; }
+
+    .hi-icon { flex-shrink: 0; color: var(--text-muted); font-size: 14px; }
+    .hi-meta { flex: 1; min-width: 0; }
+    .hi-name {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hi-detail {
+      color: var(--text-muted);
+      font-size: 11px;
+      margin-top: 1px;
+    }
+    .hi-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+    /* ── Save modal ──────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      width: 360px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.5);
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 16px; }
+    .modal input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────── -->
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M8 6H21M8 12H21M8 18H21M3 6h.01M3 12h.01M3 18h.01"/>
+  </svg>
+  <h1>텍스트 비교기</h1>
+  <div class="spacer"></div>
+  <button class="btn" id="btnClear">전체 지우기</button>
+  <button class="btn primary" id="btnSave">저장</button>
+</header>
+
+<!-- ── Input ─────────────────────────────────── -->
+<div class="input-section">
+  <div class="input-panel">
+    <div class="input-header">
+      <span class="input-label">원본 (A)</span>
+      <span class="char-count" id="countA">0자</span>
+    </div>
+    <textarea id="textA" placeholder="원본 텍스트를 입력하세요…" spellcheck="false"></textarea>
+  </div>
+  <div class="input-panel">
+    <div class="input-header">
+      <span class="input-label">수정본 (B)</span>
+      <span class="char-count" id="countB">0자</span>
+    </div>
+    <textarea id="textB" placeholder="비교할 텍스트를 입력하세요…" spellcheck="false"></textarea>
+  </div>
+</div>
+
+<!-- ── Stats bar ──────────────────────────────── -->
+<div class="stats-bar">
+  <div class="stat">
+    <span class="stat-dot add"></span>
+    <span id="statAdd">추가 0줄</span>
+  </div>
+  <div class="stat">
+    <span class="stat-dot rem"></span>
+    <span id="statRem">삭제 0줄</span>
+  </div>
+  <div class="stat">
+    <span class="stat-dot chg"></span>
+    <span id="statChg">변경 0줄</span>
+  </div>
+  <div class="view-toggle">
+    <button class="view-btn active" data-view="split">분할</button>
+    <button class="view-btn" data-view="unified">통합</button>
+  </div>
+</div>
+
+<!-- ── Diff output ────────────────────────────── -->
+<div class="diff-section" id="diffSection">
+  <div class="diff-empty" id="diffEmpty">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+    </svg>
+    <span>텍스트를 입력하면 바로 비교됩니다</span>
+  </div>
+  <div id="diffOutput"></div>
+</div>
+
+<!-- ── History panel ──────────────────────────── -->
+<div class="history-panel" id="historyPanel">
+  <div class="history-header" id="historyToggle">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+    <span class="history-title">저장 이력</span>
+    <span class="history-count" id="historyCount">0</span>
+    <svg class="history-chevron" id="historyChevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </div>
+  <div class="history-body" id="historyBody">
+    <div class="history-empty" id="historyEmpty">저장된 이력이 없습니다</div>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<!-- ── Save Modal ─────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay" style="display:none">
+  <div class="modal">
+    <h2>비교 저장</h2>
+    <input type="text" id="modalInput" placeholder="이름 (선택사항)" maxlength="60" />
+    <div class="modal-actions">
+      <button class="btn" id="modalCancel">취소</button>
+      <button class="btn primary" id="modalConfirm">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Diff Engine
+// ═══════════════════════════════════════════════════════════════
+function lcs(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0 && n === 0) return [];
+  if (m === 0) return b.map(v => ({ t: '+', v }));
+  if (n === 0) return a.map(v => ({ t: '-', v }));
+
+  // Use flat Uint16Array for performance
+  const dp = new Int32Array((m + 1) * (n + 1));
+  const W = n + 1;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i * W + j] = a[i - 1] === b[j - 1]
+        ? dp[(i - 1) * W + (j - 1)] + 1
+        : Math.max(dp[(i - 1) * W + j], dp[i * W + (j - 1)]);
+    }
+  }
+
+  const result = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      result.push({ t: '=', v: a[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i * W + (j - 1)] >= dp[(i - 1) * W + j])) {
+      result.push({ t: '+', v: b[j - 1] });
+      j--;
+    } else {
+      result.push({ t: '-', v: a[i - 1] });
+      i--;
+    }
+  }
+  return result.reverse();
+}
+
+// Line-level diff → side-by-side rows
+function buildRows(text1, text2) {
+  const lines1 = text1 === '' ? [] : text1.split('\n');
+  const lines2 = text2 === '' ? [] : text2.split('\n');
+  const raw = lcs(lines1, lines2);
+  const rows = [];
+  let i = 0;
+  while (i < raw.length) {
+    if (raw[i].t === '=') {
+      rows.push({ type: 'eq', l: raw[i].v, r: raw[i].v });
+      i++;
+    } else {
+      const rems = [], adds = [];
+      while (i < raw.length && raw[i].t === '-') { rems.push(raw[i].v); i++; }
+      while (i < raw.length && raw[i].t === '+') { adds.push(raw[i].v); i++; }
+      const max = Math.max(rems.length, adds.length);
+      for (let k = 0; k < max; k++) {
+        const l = rems[k] != null ? rems[k] : null;
+        const r = adds[k] != null ? adds[k] : null;
+        if (l != null && r != null) rows.push({ type: 'chg', l, r });
+        else if (l != null)         rows.push({ type: 'rem', l, r: null });
+        else                        rows.push({ type: 'add', l: null, r });
+      }
+    }
+  }
+  return rows;
+}
+
+// Inline char diff (limited to manageable lengths)
+function charDiff(s1, s2) {
+  if (s1.length + s2.length > 800) return null;
+  return lcs([...s1], [...s2]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HTML helpers
+// ═══════════════════════════════════════════════════════════════
+function esc(s) {
+  return s.replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+}
+
+function inlineHtml(s, side) {
+  // side: 'l' (show removes) | 'r' (show adds)
+  const cls = side === 'l' ? 'ch-rem' : 'ch-add';
+  let html = '';
+  for (const d of s) {
+    const e = esc(d.v);
+    if (d.t === '=') html += e;
+    else if (d.t === '-' && side === 'l') html += `<span class="${cls}">${e}</span>`;
+    else if (d.t === '+' && side === 'r') html += `<span class="${cls}">${e}</span>`;
+  }
+  return html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Renderer
+// ═══════════════════════════════════════════════════════════════
+let currentView = 'split';
+
+function render() {
+  const a = document.getElementById('textA').value;
+  const b = document.getElementById('textB').value;
+
+  document.getElementById('countA').textContent = a.length.toLocaleString() + '자';
+  document.getElementById('countB').textContent = b.length.toLocaleString() + '자';
+
+  const rows = buildRows(a, b);
+
+  // stats
+  let addCount = 0, remCount = 0, chgCount = 0;
+  rows.forEach(r => {
+    if (r.type === 'add') addCount++;
+    else if (r.type === 'rem') remCount++;
+    else if (r.type === 'chg') chgCount++;
+  });
+  document.getElementById('statAdd').textContent = `추가 ${addCount}줄`;
+  document.getElementById('statRem').textContent = `삭제 ${remCount}줄`;
+  document.getElementById('statChg').textContent = `변경 ${chgCount}줄`;
+
+  const empty = document.getElementById('diffEmpty');
+  const output = document.getElementById('diffOutput');
+
+  if (a === '' && b === '') {
+    empty.style.display = 'flex';
+    output.innerHTML = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  if (currentView === 'split') renderSplit(rows, output);
+  else renderUnified(rows, output);
+}
+
+function renderSplit(rows, container) {
+  let lNum = 1, rNum = 1;
+  let html = '<table class="diff-table"><colgroup>'
+    + '<col class="ln"><col class="sign"><col class="dc">'
+    + '<col class="div-col">'
+    + '<col class="ln"><col class="sign"><col class="dc">'
+    + '</colgroup><tbody>';
+
+  for (const row of rows) {
+    let lnL = '', lnR = '', signL = '', signR = '', cL = '', cR = '', trCls = '';
+
+    if (row.type === 'eq') {
+      trCls = 'eq';
+      lnL = lNum++; lnR = rNum++;
+      signL = signR = '';
+      cL = cR = esc(row.l);
+    } else if (row.type === 'rem') {
+      trCls = 'rem';
+      lnL = lNum++;
+      signL = '-'; cL = esc(row.l);
+      cR = '&nbsp;';
+    } else if (row.type === 'add') {
+      trCls = 'add';
+      lnR = rNum++;
+      signR = '+'; cR = esc(row.r);
+      cL = '&nbsp;';
+    } else { // chg
+      lnL = lNum++; lnR = rNum++;
+      const cd = charDiff(row.l, row.r);
+      if (cd) {
+        cL = inlineHtml(cd, 'l');
+        cR = inlineHtml(cd, 'r');
+      } else {
+        cL = esc(row.l);
+        cR = esc(row.r);
+      }
+      html +=
+        `<tr class="chg-l"><td class="ln">${lnL}</td><td class="sign">~</td><td class="dc">${cL || '&nbsp;'}</td>`
+        + `<td class="div-col"></td>`
+        + `<td class="ln"></td><td class="sign"></td><td class="dc placeholder">&nbsp;</td></tr>`;
+      html +=
+        `<tr class="chg-r"><td class="ln"></td><td class="sign"></td><td class="dc placeholder">&nbsp;</td>`
+        + `<td class="div-col"></td>`
+        + `<td class="ln">${lnR}</td><td class="sign">~</td><td class="dc">${cR || '&nbsp;'}</td></tr>`;
+      continue;
+    }
+
+    html +=
+      `<tr class="${trCls}">`
+      + `<td class="ln">${lnL}</td><td class="sign">${signL}</td><td class="dc">${cL || '&nbsp;'}</td>`
+      + `<td class="div-col"></td>`
+      + `<td class="ln">${lnR}</td><td class="sign">${signR}</td><td class="dc">${cR || '&nbsp;'}</td>`
+      + `</tr>`;
+  }
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function renderUnified(rows, container) {
+  let lNum = 1, rNum = 1;
+  let html = '<table class="diff-table unified"><colgroup>'
+    + '<col class="ln"><col class="ln"><col class="sign"><col class="dc">'
+    + '</colgroup><tbody>';
+
+  for (const row of rows) {
+    if (row.type === 'eq') {
+      html += `<tr class="eq"><td class="ln">${lNum++}</td><td class="ln">${rNum++}</td><td class="sign"></td><td class="dc">${esc(row.l)}</td></tr>`;
+    } else if (row.type === 'rem') {
+      html += `<tr class="rem"><td class="ln">${lNum++}</td><td class="ln"></td><td class="sign">-</td><td class="dc">${esc(row.l)}</td></tr>`;
+    } else if (row.type === 'add') {
+      html += `<tr class="add"><td class="ln"></td><td class="ln">${rNum++}</td><td class="sign">+</td><td class="dc">${esc(row.r)}</td></tr>`;
+    } else { // chg
+      const cd = charDiff(row.l, row.r);
+      const cL = cd ? inlineHtml(cd, 'l') : esc(row.l);
+      const cR = cd ? inlineHtml(cd, 'r') : esc(row.r);
+      html += `<tr class="chg-l"><td class="ln">${lNum++}</td><td class="ln"></td><td class="sign">~</td><td class="dc">${cL || '&nbsp;'}</td></tr>`;
+      html += `<tr class="chg-r"><td class="ln"></td><td class="ln">${rNum++}</td><td class="sign">~</td><td class="dc">${cR || '&nbsp;'}</td></tr>`;
+    }
+  }
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  History
+// ═══════════════════════════════════════════════════════════════
+const HISTORY_KEY = 'textdiff_history';
+const MAX_HISTORY = 50;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveHistory(list) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)));
+}
+
+function addHistoryEntry(name, a, b) {
+  if (a === '' && b === '') return;
+  const list = loadHistory();
+  const entry = {
+    id: Date.now() + Math.random().toString(36).slice(2),
+    name: name || autoName(),
+    ts: Date.now(),
+    a, b
+  };
+  list.unshift(entry);
+  saveHistory(list);
+  renderHistoryList();
+}
+
+function autoName() {
+  return new Date().toLocaleString('ko-KR', {
+    month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+}
+
+function deleteHistoryEntry(id) {
+  const list = loadHistory().filter(e => e.id !== id);
+  saveHistory(list);
+  renderHistoryList();
+}
+
+function loadEntry(id) {
+  const entry = loadHistory().find(e => e.id === id);
+  if (!entry) return;
+  document.getElementById('textA').value = entry.a;
+  document.getElementById('textB').value = entry.b;
+  render();
+}
+
+function renderHistoryList() {
+  const list = loadHistory();
+  const countEl = document.getElementById('historyCount');
+  const emptyEl = document.getElementById('historyEmpty');
+  const listEl  = document.getElementById('historyList');
+
+  countEl.textContent = list.length;
+
+  if (list.length === 0) {
+    emptyEl.style.display = 'block';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  listEl.innerHTML = list.map(entry => {
+    const date = new Date(entry.ts);
+    const timeStr = date.toLocaleString('ko-KR', {
+      month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+    const previewA = entry.a.replace(/\n/g, ' ').slice(0, 30);
+    const previewB = entry.b.replace(/\n/g, ' ').slice(0, 30);
+    const detail = `A: "${previewA || '(비어있음)'}" → B: "${previewB || '(비어있음)'}"`;
+    return `
+      <div class="history-item">
+        <span class="hi-icon">📋</span>
+        <div class="hi-meta">
+          <div class="hi-name">${esc(entry.name)}</div>
+          <div class="hi-detail">${esc(detail)} · ${esc(timeStr)}</div>
+        </div>
+        <div class="hi-actions">
+          <button class="btn" onclick="loadEntry('${entry.id}')">불러오기</button>
+          <button class="btn danger" onclick="deleteHistoryEntry('${entry.id}')">삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Auto-save
+// ═══════════════════════════════════════════════════════════════
+let autoSaveTimer = null;
+let lastAutoSavedA = null;
+let lastAutoSavedB = null;
+
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    const a = document.getElementById('textA').value;
+    const b = document.getElementById('textB').value;
+    if (a === '' && b === '') return;
+    if (a === lastAutoSavedA && b === lastAutoSavedB) return;
+    lastAutoSavedA = a;
+    lastAutoSavedB = b;
+    addHistoryEntry('자동저장 · ' + autoName(), a, b);
+  }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Event binding
+// ═══════════════════════════════════════════════════════════════
+let renderTimer = null;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 80);
+}
+
+document.getElementById('textA').addEventListener('input', () => {
+  scheduleRender();
+  scheduleAutoSave();
+});
+document.getElementById('textB').addEventListener('input', () => {
+  scheduleRender();
+  scheduleAutoSave();
+});
+
+// View toggle
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentView = btn.dataset.view;
+    render();
+  });
+});
+
+// Clear
+document.getElementById('btnClear').addEventListener('click', () => {
+  document.getElementById('textA').value = '';
+  document.getElementById('textB').value = '';
+  render();
+});
+
+// Manual save
+document.getElementById('btnSave').addEventListener('click', () => {
+  const a = document.getElementById('textA').value;
+  const b = document.getElementById('textB').value;
+  if (a === '' && b === '') { alert('저장할 내용이 없습니다.'); return; }
+  document.getElementById('modalInput').value = '';
+  document.getElementById('modalOverlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('modalInput').focus(), 50);
+});
+
+document.getElementById('modalCancel').addEventListener('click', () => {
+  document.getElementById('modalOverlay').style.display = 'none';
+});
+
+document.getElementById('modalConfirm').addEventListener('click', () => {
+  const name = document.getElementById('modalInput').value.trim();
+  const a = document.getElementById('textA').value;
+  const b = document.getElementById('textB').value;
+  addHistoryEntry(name || autoName(), a, b);
+  document.getElementById('modalOverlay').style.display = 'none';
+  // Open history panel if closed
+  const body = document.getElementById('historyBody');
+  if (!body.classList.contains('open')) {
+    document.getElementById('historyToggle').click();
+  }
+});
+
+document.getElementById('modalInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('modalConfirm').click();
+  if (e.key === 'Escape') document.getElementById('modalCancel').click();
+});
+
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('modalCancel').click();
+});
+
+// History toggle
+document.getElementById('historyToggle').addEventListener('click', () => {
+  const body = document.getElementById('historyBody');
+  const chevron = document.getElementById('historyChevron');
+  const header = document.getElementById('historyToggle');
+  body.classList.toggle('open');
+  chevron.classList.toggle('open');
+  header.classList.toggle('open');
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════
+renderHistoryList();
+render();
+</script>
+</body>
+</html>
