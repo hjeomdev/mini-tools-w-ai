@@ -1201,7 +1201,7 @@ function renderPanel(){
     lb.id='lock-btn-'+tab.id;
     lb.className='btn-lock '+(tab.fieldsLocked?'locked':'unlocked');
     lb.title=tab.fieldsLocked?'잠금 해제':'편집 잠금';
-    lb.textContent=tab.fieldsLocked?'\uD83D\uDD12 잠김':'\uD83D\uDD13 잠금';
+    lb.textContent=tab.fieldsLocked?'잠금해제':'잠금';
     lb.onclick=function(){ toggleFieldsLock(tab.id); };
     row.appendChild(lb);
     return row;
@@ -1599,15 +1599,23 @@ async function toggleFieldsLock(id){
   if(btn){
     btn.className='btn-lock '+(tab.fieldsLocked?'locked':'unlocked');
     btn.title=tab.fieldsLocked?'잠금 해제':'편집 잠금';
-    btn.innerHTML=tab.fieldsLocked?'🔒 잠김':'🔓 잠금';
+    btn.textContent=tab.fieldsLocked?'잠금해제':'잠금';
   }
+  // 요청 필드 textarea
   if(ta){
     if(tab.fieldsLocked){ ta.setAttribute('readonly',''); ta.classList.add('locked-field'); }
     else                 { ta.removeAttribute('readonly'); ta.classList.remove('locked-field'); }
+    const trimBtn=ta.parentElement?.querySelector('.btn-trim');
+    if(trimBtn) trimBtn.disabled=tab.fieldsLocked;
   }
-  // Trim 버튼 활성/비활성
-  const trimBtn=ta?.parentElement?.querySelector('.btn-trim');
-  if(trimBtn) trimBtn.disabled=tab.fieldsLocked;
+  // 응답 필드 textarea
+  const taRes=document.getElementById('fields-res-'+id);
+  if(taRes){
+    if(tab.fieldsLocked){ taRes.setAttribute('readonly',''); taRes.classList.add('locked-field'); }
+    else                 { taRes.removeAttribute('readonly'); taRes.classList.remove('locked-field'); }
+    const trimResBtn=taRes.parentElement?.querySelector('.btn-trim');
+    if(trimResBtn) trimResBtn.disabled=tab.fieldsLocked;
+  }
   showToast(tab.fieldsLocked?'필드 정의가 잠겼습니다.':'필드 정의 잠금이 해제됐습니다.');
 }
 
